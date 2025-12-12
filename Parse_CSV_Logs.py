@@ -51,11 +51,11 @@ def calculate_average_movement_time_edges(time_index_ms, movement_statuses):
     status_changes = np.diff(statuses, prepend=0)
 
     # 2. Find indices where status changes to 1 (rising edge)
-    start_indices = np.where(status_changes == 1)[0]
+    end_indices = np.where(status_changes == 0)[0]
     
     # 3. Find indices where status changes back to 0 (falling edge)
     # end_indices = np.where(status_changes == -1)[0]
-    end_indices = np.where(status_changes == 0)[0]
+    start_indices = np.where(status_changes == 1)[0]
     
     # Handle the case where the log file ends while the device is still moving (status is 1)
     if len(end_indices) < len(start_indices):
