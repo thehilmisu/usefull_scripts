@@ -16,6 +16,7 @@ TIME_INDEX_STR = []
 INTERNAL_ERROR = []
 CYCLE_COUNT = []
 MOVEMENT_STATUS_STR = []
+ACTUAL_POSITION = []
 
 with open(LOGFILE_PATH, 'r') as log_file:
     reader = csv.reader(log_file)
@@ -32,60 +33,38 @@ with open(LOGFILE_PATH, 'r') as log_file:
                 INTERNAL_ERROR.append(raw_data[3])
                 CYCLE_COUNT.append(raw_data[7])
                 MOVEMENT_STATUS_STR.append(raw_data[8])
+                ACTUAL_POSITION.append(raw_data[17])
             else:
                 print(f"ERROR: raw_data length is not match. {len(raw_data)}")
         index = index + 1
 
-""" Handle potential length mismatch """
-if len(TIME_INDEX_STR) > len(MOVEMENT_STATUS_STR):
-    MOVEMENT_STATUS_STR.append('0')
-
-def calculate_average_movement_time_edges(time_index_ms, movement_statuses):
-   
+def calculate_movement_time_average(movement_statuses, actual_position_value, time_index_np):
+    time_diff_array = []
+    position = np.array(actual_position_value, dtype=int)
     statuses = np.array(movement_statuses, dtype=int)
-    times = np.array(time_index_ms, dtype=np.int64)
-
-    # 1. Detect changes in status
-    # np.diff([0, 0, 1, 1, 0, 1, 0]) -> [0, 1, 0, -1, 1, -1]
-    # We prepend a 0 to catch the start of a movement if it begins at index 0
-    status_changes = np.diff(statuses, prepend=0)
-
-    # 2. Find indices where status changes to 1 (rising edge)
-    end_indices = np.where(status_changes == 0)[0]
     
-    # 3. Find indices where status changes back to 0 (falling edge)
-    # end_indices = np.where(status_changes == -1)[0]
-    start_indices = np.where(status_changes == 1)[0]
-    
-    # Handle the case where the log file ends while the device is still moving (status is 1)
-    if len(end_indices) < len(start_indices):
-        # Append the last timestamp as the end time of the final movement
-        end_indices = np.append(end_indices, len(statuses) - 1)
-
-    start_times = times[start_indices]
-    end_times = times[end_indices]
-    
-    durations = [] 
-    for i in range(len(end_times)):
-        duration_seconds = (end_times[i] - start_times[i]) / 1000.0
-        if duration_seconds >= 0:
-            durations.append(duration_seconds)
-
-    return np.mean(durations)
+    start_position_indices = np.where((statuses == 1) & (position == 80))
+    end_position_indices = np.where((statuses == 1) & (position == 180))
 
 
+    print(len(start_position_indices[0]))
+    print(len(end_position_indices[0]))
+
+    for i in range(len(start_position_indices[0])):
+        time_diff_array.append(abs(time_index_np[end_position_indices[0][i]] - time_index_np[start_position_indices[0][i]]))
+        
+    return np.mean(time_diff_array)
+        
 
 try:
     time_index_np = np.array(TIME_INDEX_STR, dtype=np.int64)
     move_status_np = np.array(MOVEMENT_STATUS_STR, dtype=int)
+    actual_positions_np = np.array(ACTUAL_POSITION, dtype=int)
 except ValueError as e:
     print(f"\nError converting data types: {e}")
     sys.exit(1)
 
-average_time = calculate_average_movement_time_edges(time_index_np, move_status_np)
-
-print(f"\nSuccessfully processed {len(time_index_np)} records.")
-print(f"The average movement time is: {average_time:.4f} seconds")
-print(f"The average movement time is: {average_time / 60.0:.4f} minutes")
+average_time = calculate_movement_time_average(move_status_np, actual_positions_np, time_index_np)
 
 
+print(average_time)
